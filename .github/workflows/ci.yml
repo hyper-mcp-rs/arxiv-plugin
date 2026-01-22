@@ -47,5 +47,5 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
 
-      - name: Build plugins
+      - name: Build plugin
         run: cargo build --release --target wasm32-wasip1
