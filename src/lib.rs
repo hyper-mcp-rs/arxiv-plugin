@@ -61,7 +61,7 @@ fn search(input: CallToolRequest) -> Result<CallToolResult, Error> {
         ),
         headers: [(
             "User-Agent".to_string(),
-            "hyper-mcp/1.0 (https://github.com/tuananh/hyper-mcp)".to_string(),
+            "hyper-mcp/1.0 (https://github.com/hyper-mcp-rs/hyper-mcp)".to_string(),
         )]
         .into_iter()
         .collect(),

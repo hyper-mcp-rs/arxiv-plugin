@@ -1,4 +1,4 @@
-# arxiv
+# arxiv-plugin
 
 A plugin that let you search for papers on arXiv and download them.
 

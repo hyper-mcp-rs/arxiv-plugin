@@ -9,16 +9,9 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-oci-images:
+  build-plugin:
     environment: staging
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-24.04
-            arch: amd64
-          - os: ubuntu-24.04-arm
-            arch: arm64
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       packages: write
@@ -43,130 +36,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push hyper-mcp
-        run: |
-          echo "Building hyper-mcp image"
-          ghcr_image="ghcr.io/${{ github.repository_owner }}/hyper-mcp:nightly-${{ matrix.arch }}"
-          docker build -t $ghcr_image .
-
-          docker push $ghcr_image
-
-          cosign sign --yes $ghcr_image
-
       # we dont need to build multi-arch plugin images as they are wasm32-wasip1
       # so we can just build amd64 and push it to the registry
       - name: Build and push plugin images
-        if: matrix.arch == 'amd64'
         run: |
-          for plugin in examples/plugins/v{1,2}/*/; do
-            plugin_name=$(basename $plugin)
-            echo "Building plugin: $plugin_name"
-
-            image_name="ghcr.io/${{ github.repository_owner }}/${plugin_name}-plugin:nightly"
-            docker build -t $image_name $plugin
-            docker push $image_name
-
-            cosign sign --yes $image_name
-          done
-
-  # do this before we build nightly binaries
-  prepare-nightly-release:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Set nightly tag to latest main
-        run: |
-          git fetch origin main
-          git tag -f nightly origin/main
-          git push -f origin nightly
-
-      - name: Delete existing nightly release
-        run: gh release delete nightly --yes || true
-
-  build-nightly-binaries:
-    environment: staging
-    needs: prepare-nightly-release
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-24.04
-            arch: x86_64
-            target: x86_64-unknown-linux-gnu
-            ext: ""
-          - os: ubuntu-24.04-arm
-            arch: aarch64
-            target: aarch64-unknown-linux-gnu
-            ext: ""
-          - os: macos-latest
-            arch: aarch64
-            target: aarch64-apple-darwin
-            ext: ""
-          - os: windows-latest
-            arch: x86_64
-            target: x86_64-pc-windows-msvc
-            ext: ".exe"
-
-    runs-on: ${{ matrix.os }}
-    permissions:
-      contents: write
-      packages: write
-
-    steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - run: cargo install cargo-auditable
-
-      - name: Install compilation targets
-        run: rustup target add ${{ matrix.target }}
-
-      - name: Build
-        run: cargo auditable build --target ${{ matrix.target }} --release
-
-      - name: Install zip (Windows only)
-        if: runner.os == 'Windows'
-        run: choco install zip -y
-
-      - name: Create archives and checksums
-        shell: bash
-        run: |
-          mkdir -p dist/${{ matrix.target }}
-
-          bin_name="hyper-mcp${{ matrix.ext }}"
-          cp target/${{ matrix.target }}/release/$bin_name dist/${{ matrix.target }}/
-
-          cd dist/${{ matrix.target }}
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            zip ../hyper-mcp-${{ matrix.target }}.zip $bin_name
-          else
-            tar -czf ../hyper-mcp-${{ matrix.target }}.tar.gz $bin_name
-          fi
-          cd ..
-
-          {
-            if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-              file="hyper-mcp-${{ matrix.target }}.zip"
-            else
-              file="hyper-mcp-${{ matrix.target }}.tar.gz"
-            fi
-            echo "$file:"
-            if command -v sha256sum >/dev/null 2>&1; then
-              sha256sum $file
-            else
-              shasum -a 256 $file
-            fi
-          } > checksums-${{ matrix.target }}.txt
+          image_name="ghcr.io/${{ github.repository }}:nightly"
+          docker build -t $image_name .
+          docker push $image_name
+          cosign sign --yes $image_name
 
       - name: Create new nightly release
         id: create_release
@@ -177,56 +54,16 @@ jobs:
           draft: false
           prerelease: true
           generate_release_notes: true
-          preserve_order: true
-          files: |
-            dist/hyper-mcp-${{ matrix.target }}.tar.gz
-            dist/hyper-mcp-${{ matrix.target }}.zip
-            dist/checksums-${{ matrix.target }}.txt
           body: |
             Nightly build from `main` branch.
 
             This release includes:
-            - hyper-mcp binaries for Linux & macOS
-            - hyper-mcp container image: `ghcr.io/${{ github.repository_owner }}/hyper-mcp:nightly`
-            - Plugin images: `ghcr.io/${{ github.repository_owner }}/<plugin-name>-plugin:nightly`
+            - Plugin image: `ghcr.io/${{ github.repository }}:nightly`
 
             All container images are signed with Cosign. Verify the image like this:
             ```bash
             cosign verify \
-              --certificate-identity "https://github.com/hyper-mcp-rs/hyper-mcp/.github/workflows/nightly.yml@refs/heads/main" \
+              --certificate-identity "https://github.com/${{ github.repository }}/.github/workflows/nightly.yml@refs/heads/main" \
               --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-              ghcr.io/hyper-mcp-rs/hyper-mcp:nightly
+              ghcr.io/${{ github.repository }}:nightly
             ```
-
-  create-multiarch-manifests:
-    needs: build-oci-images
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-      id-token: write # needed for keyless signing
-    steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-
-      - name: Install cosign
-        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create and push multi-arch nightly tags
-        run: |
-          # Main image
-          docker buildx imagetools create \
-            -t ghcr.io/${{ github.repository_owner }}/hyper-mcp:nightly \
-            ghcr.io/${{ github.repository_owner }}/hyper-mcp:nightly-amd64 \
-            ghcr.io/${{ github.repository_owner }}/hyper-mcp:nightly-arm64
-
-          cosign sign --yes ghcr.io/${{ github.repository_owner }}/hyper-mcp:nightly
