@@ -14,7 +14,7 @@ base64-serde = "~0.8"
 chrono = { version = "~0.4", features = ["serde"] }
 extism-pdk = "~1.4"
 git-version = "~0.3"
-quick-xml = { version = "~0.40", features = ["serialize"] }
+quick-xml = { version = "~0.40", features = ["serialize", "overlapped-lists"] }
 schemars = "~1.2"
 oauth2 = { version = "~5.0", default-features = false }
 serde = { version = "~1.0", features = ["derive"] }

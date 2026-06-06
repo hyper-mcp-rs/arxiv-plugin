@@ -459,6 +459,7 @@ mod tests {
 
     const ELECTRON_FEED: &str = include_str!("../tests/fixtures/electron.xml");
     const ERROR_FEED: &str = include_str!("../tests/fixtures/error.xml");
+    const RUST_FEED: &str = include_str!("../tests/fixtures/rust.xml");
 
     /// Parse a feed and unwrap the successful results variant.
     fn parse_results(xml: &str) -> QueryResponse {
@@ -553,6 +554,26 @@ mod tests {
         );
         // source_url is only populated after a live HEAD check.
         assert!(entry.source_url.is_none());
+    }
+
+    #[test]
+    fn parses_entry_with_noncontiguous_links() {
+        // The last entry in this feed has its `alternate`/`pdf` links early and
+        // a third `doi` link later, separated by other elements. quick-xml's
+        // `overlapped-lists` feature is required to collect such non-contiguous
+        // repeated elements into a single `Vec` instead of erroring with
+        // "duplicate field `link`".
+        let response = parse_results(RUST_FEED);
+        assert_eq!(response.entries.len(), 5);
+
+        let last = response.entries.last().unwrap();
+        assert_eq!(last.id, "2411.14174v2");
+        assert_eq!(last.doi.as_deref(), Some("10.14722/ndss.2025.241407"));
+        assert_eq!(last.abstract_url, "https://arxiv.org/abs/2411.14174v2");
+        assert_eq!(
+            last.pdf_url.as_deref(),
+            Some("https://arxiv.org/pdf/2411.14174v2")
+        );
     }
 
     #[test]
