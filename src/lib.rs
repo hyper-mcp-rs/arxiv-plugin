@@ -121,8 +121,9 @@ fn query(input: CallToolRequest) -> CallToolResult {
         if entry.id.is_empty() {
             continue;
         }
-        let candidate = eprint_url(&entry.id);
-        if head_ok(&candidate) {
+        if let Some(candidate) = eprint_url(&entry.id)
+            && head_ok(candidate.as_str())
+        {
             entry.source_url = Some(candidate);
         }
     }

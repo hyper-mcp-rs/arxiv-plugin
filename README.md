@@ -78,6 +78,12 @@ Notes on the parsing:
   The `pdf` link is intentionally duplicated here even though it is also
   available discretely as `pdf_url`.
 
+Every URL field (`abstract_url`, `pdf_url`, `source_url`, and the `related_links`
+values) is parsed and validated as a well-formed URL before being returned; any
+malformed URL is omitted rather than passed through. The values are still
+serialized as JSON strings, and the output schema marks them with
+`"format": "uri"`.
+
 arXiv reports query errors (such as malformed ids) as an Atom feed containing a
 single error entry; the plugin detects these and returns them as a tool error.
 

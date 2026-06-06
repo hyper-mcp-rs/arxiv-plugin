@@ -9,6 +9,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use url::Url;
 
 const ABS_PREFIX_HTTP: &str = "http://arxiv.org/abs/";
 const ABS_PREFIX_HTTPS: &str = "https://arxiv.org/abs/";
@@ -157,24 +158,27 @@ pub struct Entry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub doi: Option<String>,
 
-    /// URL of the article's abstract page.
-    pub abstract_url: String,
-
-    /// URL of the article's PDF, if present.
+    /// URL of the article's abstract page. Present whenever the feed provides
+    /// a well-formed URL (always, in practice).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pdf_url: Option<String>,
+    pub abstract_url: Option<Url>,
+
+    /// URL of the article's PDF, if present and well-formed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pdf_url: Option<Url>,
 
     /// URL of the article's source (e-print) bundle, populated only when the
     /// e-print URL responds with a successful HEAD request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_url: Option<String>,
+    pub source_url: Option<Url>,
 
     /// Additional links associated with the article, keyed by their `title`
     /// (e.g. `pdf`, `doi`). Includes every entry `<link>` that carries both a
-    /// `rel` and a `title` attribute. Note that the `pdf` link is also exposed
-    /// discretely as `pdf_url`; it is duplicated here for completeness.
+    /// `rel` and a `title` attribute and a well-formed URL. Note that the `pdf`
+    /// link is also exposed discretely as `pdf_url`; it is duplicated here for
+    /// completeness.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub related_links: BTreeMap<String, String>,
+    pub related_links: BTreeMap<String, Url>,
 }
 
 /// The full response of a `query` tool call.
@@ -312,6 +316,17 @@ fn trimmed_opt(s: Option<String>) -> Option<String> {
     s.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
 }
 
+/// Parse a string into a [`Url`], returning `None` for empty or malformed
+/// input. Used to ensure only well-formed URLs are ever surfaced to callers.
+fn parse_url_opt(s: &str) -> Option<Url> {
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Url::parse(trimmed).ok()
+    }
+}
+
 /// Parse a bare arXiv id out of the `<id>` URL.
 ///
 /// The `<id>` tag holds the abstract URL, e.g.
@@ -327,9 +342,10 @@ pub fn parse_arxiv_id(id_url: &str) -> String {
         .to_string()
 }
 
-/// Build the candidate e-print (source) URL for a bare arXiv id.
-pub fn eprint_url(id: &str) -> String {
-    format!("https://arxiv.org/e-print/{id}")
+/// Build the candidate e-print (source) URL for a bare arXiv id. Returns
+/// `None` if the resulting string is not a valid URL.
+pub fn eprint_url(id: &str) -> Option<Url> {
+    parse_url_opt(&format!("https://arxiv.org/e-print/{id}"))
 }
 
 impl Entry {
@@ -340,36 +356,36 @@ impl Entry {
     pub(crate) fn from_xml(xml: XmlEntry) -> Entry {
         let id = parse_arxiv_id(&xml.id);
 
+        // Prefer the `alternate` link (the versioned abstract URL); fall back
+        // to the raw `<id>` URL. Only a well-formed URL is surfaced.
         let abstract_url = xml
             .links
             .iter()
             .find(|l| l.rel.as_deref() == Some("alternate"))
-            .map(|l| l.href.clone())
-            .filter(|h| !h.is_empty())
-            .unwrap_or_else(|| xml.id.trim().to_string());
+            .and_then(|l| parse_url_opt(&l.href))
+            .or_else(|| parse_url_opt(&xml.id));
 
         let pdf_url = xml
             .links
             .iter()
             .find(|l| l.title.as_deref() == Some("pdf"))
-            .map(|l| l.href.clone())
-            .filter(|h| !h.is_empty());
+            .and_then(|l| parse_url_opt(&l.href));
 
-        // Collect every link that carries both a `rel` and a `title` attribute,
-        // keyed by its title (e.g. `pdf`, `doi`). The abstract link has no
-        // title and is exposed separately via `abstract_url`.
+        // Collect every link that carries both a `rel` and a `title` attribute
+        // and a well-formed URL, keyed by its title (e.g. `pdf`, `doi`). The
+        // abstract link has no title and is exposed separately via
+        // `abstract_url`.
         let related_links = xml
             .links
             .iter()
             .filter(|l| l.rel.is_some())
             .filter_map(|l| {
                 let title = l.title.as_deref()?.trim();
-                let href = l.href.trim();
-                if title.is_empty() || href.is_empty() {
-                    None
-                } else {
-                    Some((title.to_string(), href.to_string()))
+                if title.is_empty() {
+                    return None;
                 }
+                let url = parse_url_opt(&l.href)?;
+                Some((title.to_string(), url))
             })
             .collect();
 
@@ -525,8 +541,8 @@ mod tests {
     #[test]
     fn eprint_url_is_built_from_id() {
         assert_eq!(
-            eprint_url("hep-ex/0307015v1"),
-            "https://arxiv.org/e-print/hep-ex/0307015v1"
+            eprint_url("hep-ex/0307015v1").as_ref().map(Url::as_str),
+            Some("https://arxiv.org/e-print/hep-ex/0307015v1")
         );
     }
 
@@ -572,11 +588,11 @@ mod tests {
         assert!(entry.doi.is_none());
 
         assert_eq!(
-            entry.abstract_url,
-            "https://arxiv.org/abs/cond-mat/0011267v1"
+            entry.abstract_url.as_ref().map(Url::as_str),
+            Some("https://arxiv.org/abs/cond-mat/0011267v1")
         );
         assert_eq!(
-            entry.pdf_url.as_deref(),
+            entry.pdf_url.as_ref().map(Url::as_str),
             Some("https://arxiv.org/pdf/cond-mat/0011267v1")
         );
         // source_url is only populated after a live HEAD check.
@@ -586,7 +602,7 @@ mod tests {
         // related-links map contains just `pdf` (the abstract link is omitted).
         assert_eq!(entry.related_links.len(), 1);
         assert_eq!(
-            entry.related_links.get("pdf").map(String::as_str),
+            entry.related_links.get("pdf").map(Url::as_str),
             Some("https://arxiv.org/pdf/cond-mat/0011267v1")
         );
     }
@@ -604,20 +620,23 @@ mod tests {
         let last = response.entries.last().unwrap();
         assert_eq!(last.id, "2411.14174v2");
         assert_eq!(last.doi.as_deref(), Some("10.14722/ndss.2025.241407"));
-        assert_eq!(last.abstract_url, "https://arxiv.org/abs/2411.14174v2");
         assert_eq!(
-            last.pdf_url.as_deref(),
+            last.abstract_url.as_ref().map(Url::as_str),
+            Some("https://arxiv.org/abs/2411.14174v2")
+        );
+        assert_eq!(
+            last.pdf_url.as_ref().map(Url::as_str),
             Some("https://arxiv.org/pdf/2411.14174v2")
         );
 
         // The related-links map captures both the `pdf` (duplicated from
         // `pdf_url`) and the non-contiguous `doi` link.
         assert_eq!(
-            last.related_links.get("pdf").map(String::as_str),
+            last.related_links.get("pdf").map(Url::as_str),
             Some("https://arxiv.org/pdf/2411.14174v2")
         );
         assert_eq!(
-            last.related_links.get("doi").map(String::as_str),
+            last.related_links.get("doi").map(Url::as_str),
             Some("https://doi.org/10.14722/ndss.2025.241407")
         );
     }
