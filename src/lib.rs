@@ -12,6 +12,14 @@ use url::Url;
 
 const ARXIV_API_URL: &str = "https://export.arxiv.org/api/query";
 
+/// Descriptive User-Agent sent with every request, per the arXiv API's usage
+/// guidelines (which ask clients to identify themselves so traffic can be
+/// attributed and throttled fairly rather than served a generic 503).
+const USER_AGENT: &str = git_version::git_version!(
+    prefix = "arxiv-mcp-plugin/",
+    suffix = " (+https://github.com/hyper-mcp-rs/hyper-mcp)"
+);
+
 pub(crate) fn list_tools(_input: ListToolsRequest) -> Result<ListToolsResult> {
     Ok(ListToolsResult {
         tools: vec![Tool {
@@ -89,7 +97,9 @@ fn query(input: CallToolRequest) -> CallToolResult {
         }
     }
 
-    let req = HttpRequest::new(url.as_str()).with_method("GET");
+    let req = HttpRequest::new(url.as_str())
+        .with_method("GET")
+        .with_header("User-Agent", USER_AGENT);
     let res = match http_request_with_retry(&req) {
         Ok(res) => res,
         Err(e) => return CallToolResult::error(format!("arXiv API request failed: {e}")),
@@ -158,7 +168,9 @@ fn query(input: CallToolRequest) -> CallToolResult {
 
 /// Return `true` if a HEAD request to `url` succeeds with a 2xx status.
 fn head_ok(url: &str) -> bool {
-    let req = HttpRequest::new(url).with_method("HEAD");
+    let req = HttpRequest::new(url)
+        .with_method("HEAD")
+        .with_header("User-Agent", USER_AGENT);
     match http::request::<()>(&req, None) {
         Ok(res) => res.status_code() >= 200 && res.status_code() < 300,
         Err(_) => false,
