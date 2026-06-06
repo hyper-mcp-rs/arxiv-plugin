@@ -46,7 +46,7 @@ deserializes into a structured response:
       "categories": ["cond-mat.supr-con", "cond-mat.str-el"],
       "comment": "...",                  // optional
       "journal_ref": "...",              // optional
-      "doi": "...",                      // optional
+      "dois": ["..."],                    // optional (may be several)
       "abstract_url": "https://arxiv.org/abs/cond-mat/0011267v1",
       "pdf_url": "https://arxiv.org/pdf/cond-mat/0011267v1",
       "source_url": "https://arxiv.org/e-print/cond-mat/0011267v1",  // optional

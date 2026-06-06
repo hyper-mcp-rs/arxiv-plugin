@@ -155,9 +155,10 @@ pub struct Entry {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub journal_ref: Option<String>,
 
-    /// The article DOI, if present.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub doi: Option<String>,
+    /// The article DOIs, if present. A single article may resolve to several
+    /// DOIs (e.g. an original plus errata).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dois: Vec<String>,
 
     /// URL of the article's abstract page. Present whenever the feed provides
     /// a well-formed URL (always, in practice).
@@ -274,8 +275,11 @@ pub(crate) struct XmlEntry {
     pub comment: Option<String>,
     #[serde(rename = "journal_ref", default)]
     pub journal_ref: Option<String>,
+    // A single article may carry multiple `<arxiv:doi>` elements (original plus
+    // errata), so this must be a `Vec` (a scalar would fail with "duplicate
+    // field `doi`").
     #[serde(rename = "doi", default)]
-    pub doi: Option<String>,
+    pub doi: Vec<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -427,7 +431,12 @@ impl Entry {
             categories,
             comment: trimmed_opt(xml.comment),
             journal_ref: trimmed_opt(xml.journal_ref),
-            doi: trimmed_opt(xml.doi),
+            dois: xml
+                .doi
+                .iter()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
             abstract_url,
             pdf_url,
             source_url: None,
@@ -512,6 +521,7 @@ mod tests {
     const ERROR_FEED: &str = include_str!("../tests/fixtures/error.xml");
     const RUST_FEED: &str = include_str!("../tests/fixtures/rust.xml");
     const RUST_LASTUPDATED_FEED: &str = include_str!("../tests/fixtures/rust_lastupdated.xml");
+    const MULTI_DOI_FEED: &str = include_str!("../tests/fixtures/multi_doi.xml");
 
     /// Parse a feed and unwrap the successful results variant.
     fn parse_results(xml: &str) -> QueryResponse {
@@ -594,7 +604,7 @@ mod tests {
             Some("J. Electron Spectr. Relat. Phenom. 117-118, 203 (2001)")
         );
         assert!(entry.comment.as_deref().unwrap().contains("special issue"));
-        assert!(entry.doi.is_none());
+        assert!(entry.dois.is_empty());
 
         assert_eq!(
             entry.abstract_url.as_ref().map(Url::as_str),
@@ -628,7 +638,7 @@ mod tests {
 
         let last = response.entries.last().unwrap();
         assert_eq!(last.id, "2411.14174v2");
-        assert_eq!(last.doi.as_deref(), Some("10.14722/ndss.2025.241407"));
+        assert_eq!(last.dois, vec!["10.14722/ndss.2025.241407".to_string()]);
         assert_eq!(
             last.abstract_url.as_ref().map(Url::as_str),
             Some("https://arxiv.org/abs/2411.14174v2")
@@ -647,6 +657,24 @@ mod tests {
         assert_eq!(
             last.related_links.get("doi").map(Url::as_str),
             Some("https://doi.org/10.14722/ndss.2025.241407")
+        );
+    }
+
+    #[test]
+    fn parses_entry_with_multiple_dois() {
+        // gr-qc/9910091 carries five `<arxiv:doi>` elements; a scalar field
+        // would fail with "duplicate field `doi`".
+        let response = parse_results(MULTI_DOI_FEED);
+        let entry = &response.entries[0];
+        assert_eq!(
+            entry.dois,
+            vec![
+                "10.1103/PhysRevD.61.084004".to_string(),
+                "10.1103/PhysRevD.63.049902".to_string(),
+                "10.1103/PhysRevD.65.069902".to_string(),
+                "10.1103/PhysRevD.67.089901".to_string(),
+                "10.1103/PhysRevD.78.109902".to_string(),
+            ]
         );
     }
 

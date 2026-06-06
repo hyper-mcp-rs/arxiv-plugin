@@ -1,0 +1,37 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/mf60KTUgoje8bsoTUEYewKPA9iU</id>
+  <title>arXiv Query: search_query=&amp;id_list=gr-qc/9910091&amp;start=0&amp;max_results=10</title>
+  <updated>2026-06-06T20:44:47Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=&amp;start=0&amp;max_results=10&amp;id_list=gr-qc/9910091" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>10</opensearch:itemsPerPage>
+  <opensearch:totalResults>1</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/gr-qc/9910091v3</id>
+    <title>The evolution of circular, non-equatorial orbits of Kerr black holes due to gravitational-wave emission</title>
+    <updated>2001-01-05T22:22:39Z</updated>
+    <link href="https://arxiv.org/abs/gr-qc/9910091v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/gr-qc/9910091v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>  A major focus of much current research in gravitation theory is on understanding how radiation reaction drives the evolution of a binary system, particularly in the extreme mass ratio limit. Such research is of direct relevance to gravitational-wave sources for space-based detectors (such as LISA). We present here a study of the radiative evolution of circular (i.e., constant Boyer-Lindquist coordinate radius), non-equatorial Kerr black hole orbits. Recent theorems have shown that, at least in an adiabatic evolution, such orbits evolve from one circular configuration into another, changing only their radius and inclination angle. This constrains the system's evolution in such a way that the change in its Carter constant can be deduced from knowledge of gravitational wave fluxes propagating to infinity and down the black hole's horizon. Thus, in this particular case, a local radiation reaction force is not needed. In accordance with post-Newtonian weak-field predictions, we find that inclined orbits radiatively evolve to larger inclination angles (although the post-Newtonian prediction overestimates the rate of this evolution in the strong field by a factor $\lesssim 3$). We also find that the gravitational waveforms emitted by these orbits are rather complicated, particularly when the hole is rapidly spinning, as the radiation is influenced by many harmonics of the orbital frequencies.</summary>
+    <category term="gr-qc" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="astro-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <published>1999-10-26T18:32:02Z</published>
+    <arxiv:comment>Typo found in Eq. (4.52), fixed here. An erratum is in press</arxiv:comment>
+    <arxiv:primary_category term="gr-qc"/>
+    <arxiv:journal_ref>Phys.Rev.D61:084004,2000; Erratum-ibid.D63:049902,2001; Erratum-ibid.D65:069902,2002; Erratum-ibid.D67:089901,2003; Erratum-ibid.D78:109902,2008</arxiv:journal_ref>
+    <author>
+      <name>Scott A. Hughes</name>
+    </author>
+    <arxiv:doi>10.1103/PhysRevD.61.084004</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1103/PhysRevD.61.084004" title="doi"/>
+    <arxiv:doi>10.1103/PhysRevD.63.049902</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1103/PhysRevD.63.049902" title="doi"/>
+    <arxiv:doi>10.1103/PhysRevD.65.069902</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1103/PhysRevD.65.069902" title="doi"/>
+    <arxiv:doi>10.1103/PhysRevD.67.089901</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1103/PhysRevD.67.089901" title="doi"/>
+    <arxiv:doi>10.1103/PhysRevD.78.109902</arxiv:doi>
+    <link rel="related" href="https://doi.org/10.1103/PhysRevD.78.109902" title="doi"/>
+  </entry>
+</feed>
