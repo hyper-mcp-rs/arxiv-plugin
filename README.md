@@ -22,9 +22,17 @@ structured metadata for each matching article.
 | `max_results`  | int    | The maximum number of results to return (default `10`, max `2000`). |
 | `sortBy`       | enum   | One of `relevance`, `lastUpdatedDate`, `submittedDate`. |
 | `sortOrder`    | enum   | One of `ascending`, `descending`. |
+| `verify_source_url` | bool | Whether to verify each entry's e-print `source_url` with a `HEAD` request (default `true`). Set `false` for large/unbounded queries — see below. |
 
 If both `search_query` and `id_list` are provided, the results are the articles
 in `id_list` that also match `search_query` (i.e. `id_list` acts as a filter).
+
+**Performance note:** `source_url` verification issues one HTTP `HEAD` request
+per returned entry. For large or unbounded result sets this is slow (and can
+time out), so set `verify_source_url` to `false` for bulk queries — `source_url`
+is then omitted from every entry while all other fields are returned as usual.
+Prefer small slices (via `start`/`max_results`) when you do want verified
+source links.
 
 **Output:** The arXiv API returns an Atom 1.0 XML feed, which the plugin
 deserializes into a structured response:

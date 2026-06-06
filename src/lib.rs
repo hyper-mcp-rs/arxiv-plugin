@@ -116,15 +116,19 @@ fn query(input: CallToolRequest) -> CallToolResult {
     };
 
     // Populate the source (e-print) URL for entries whose e-print bundle
-    // actually exists, verified with a HEAD request.
-    for entry in &mut response.entries {
-        if entry.id.is_empty() {
-            continue;
-        }
-        if let Some(candidate) = eprint_url(&entry.id)
-            && head_ok(candidate.as_str())
-        {
-            entry.source_url = Some(candidate);
+    // actually exists, verified with a HEAD request. This issues one request
+    // per entry, so it is skippable (e.g. for large or unbounded queries) via
+    // `verify_source_url=false`, in which case `source_url` is left unset.
+    if args.verify_source_url.unwrap_or(true) {
+        for entry in &mut response.entries {
+            if entry.id.is_empty() {
+                continue;
+            }
+            if let Some(candidate) = eprint_url(&entry.id)
+                && head_ok(candidate.as_str())
+            {
+                entry.source_url = Some(candidate);
+            }
         }
     }
 

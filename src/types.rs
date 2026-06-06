@@ -97,6 +97,18 @@ pub struct QueryArguments {
     /// The sort direction: ascending or descending.
     #[serde(rename = "sortOrder", default, skip_serializing_if = "Option::is_none")]
     pub sort_order: Option<SortOrder>,
+
+    /// Whether to verify and populate each entry's `source_url` (the e-print
+    /// bundle). Defaults to `true`. Verification issues one HTTP `HEAD` request
+    /// per result, so for large or unbounded queries set this to `false` to
+    /// avoid slow responses (and potential timeouts); `source_url` is then
+    /// omitted from every entry.
+    #[serde(
+        rename = "verify_source_url",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub verify_source_url: Option<bool>,
 }
 
 // ---------------------------------------------------------------------------
@@ -539,6 +551,22 @@ mod tests {
     const RUST_FEED: &str = include_str!("../tests/fixtures/rust.xml");
     const RUST_LASTUPDATED_FEED: &str = include_str!("../tests/fixtures/rust_lastupdated.xml");
     const MULTI_DOI_FEED: &str = include_str!("../tests/fixtures/multi_doi.xml");
+
+    #[test]
+    fn query_arguments_deserialize() {
+        // Omitted optional fields default to None.
+        let args: QueryArguments = serde_json::from_str(r#"{"search_query":"all:rust"}"#).unwrap();
+        assert_eq!(args.search_query.as_deref(), Some("all:rust"));
+        assert_eq!(args.verify_source_url, None);
+
+        // The verify_source_url flag maps from its JSON key.
+        let args: QueryArguments = serde_json::from_str(
+            r#"{"search_query":"all:rust","max_results":2000,"verify_source_url":false}"#,
+        )
+        .unwrap();
+        assert_eq!(args.max_results, Some(2000));
+        assert_eq!(args.verify_source_url, Some(false));
+    }
 
     /// Parse a feed and unwrap the successful results variant.
     fn parse_results(xml: &str) -> QueryResponse {
