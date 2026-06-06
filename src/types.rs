@@ -1,0 +1,584 @@
+//! Request and response types for the arXiv `query` tool.
+//!
+//! The public [`QueryArguments`] / [`QueryResponse`] types derive [`JsonSchema`]
+//! so the plugin can advertise structured input and output schemas. The `Xml*`
+//! types are private intermediate representations used to deserialize the
+//! Atom 1.0 feed returned by the arXiv API before it is transformed into the
+//! clean, namespace-free [`QueryResponse`].
+
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+const ABS_PREFIX_HTTP: &str = "http://arxiv.org/abs/";
+const ABS_PREFIX_HTTPS: &str = "https://arxiv.org/abs/";
+
+// ---------------------------------------------------------------------------
+// Tool arguments (structured input)
+// ---------------------------------------------------------------------------
+
+/// How to sort the result set. Mirrors the arXiv `sortBy` parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub enum SortBy {
+    #[serde(rename = "relevance")]
+    Relevance,
+    #[serde(rename = "lastUpdatedDate")]
+    LastUpdatedDate,
+    #[serde(rename = "submittedDate")]
+    SubmittedDate,
+}
+
+impl SortBy {
+    pub fn as_param(&self) -> &'static str {
+        match self {
+            SortBy::Relevance => "relevance",
+            SortBy::LastUpdatedDate => "lastUpdatedDate",
+            SortBy::SubmittedDate => "submittedDate",
+        }
+    }
+}
+
+/// The direction of the sort. Mirrors the arXiv `sortOrder` parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub enum SortOrder {
+    #[serde(rename = "ascending")]
+    Ascending,
+    #[serde(rename = "descending")]
+    Descending,
+}
+
+impl SortOrder {
+    pub fn as_param(&self) -> &'static str {
+        match self {
+            SortOrder::Ascending => "ascending",
+            SortOrder::Descending => "descending",
+        }
+    }
+}
+
+/// Arguments accepted by the `query` tool. These map directly onto the
+/// parameters of the arXiv query interface.
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct QueryArguments {
+    /// The arXiv search query, e.g. `all:electron`, `ti:"quantum criticality"`,
+    /// or a boolean expression such as `au:del_maestro AND ti:checkerboard`.
+    /// See the arXiv API user manual for the full query-construction syntax.
+    #[serde(
+        rename = "search_query",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub search_query: Option<String>,
+
+    /// A comma-delimited list of arXiv ids to fetch, e.g. `2301.00001,hep-ex/0307015`.
+    /// If both `search_query` and `id_list` are provided, results are the
+    /// articles in `id_list` that also match `search_query`.
+    #[serde(rename = "id_list", default, skip_serializing_if = "Option::is_none")]
+    pub id_list: Option<String>,
+
+    /// The 0-based index of the first returned result. Defaults to 0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<u32>,
+
+    /// The maximum number of results to return. Defaults to 10. arXiv limits
+    /// this to at most 2000 per call.
+    #[serde(
+        rename = "max_results",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub max_results: Option<u32>,
+
+    /// How to sort results: by relevance, last updated date, or submitted date.
+    #[serde(rename = "sortBy", default, skip_serializing_if = "Option::is_none")]
+    pub sort_by: Option<SortBy>,
+
+    /// The sort direction: ascending or descending.
+    #[serde(rename = "sortOrder", default, skip_serializing_if = "Option::is_none")]
+    pub sort_order: Option<SortOrder>,
+}
+
+// ---------------------------------------------------------------------------
+// Tool response (structured output)
+// ---------------------------------------------------------------------------
+
+/// An author of an article.
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Author {
+    /// The author's name.
+    pub name: String,
+
+    /// The author's affiliation, if provided.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub affiliation: Option<String>,
+}
+
+/// A single article returned by an arXiv query.
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Entry {
+    /// The bare arXiv identifier, parsed from the `<id>` tag (the
+    /// `http(s)://arxiv.org/abs/` prefix is stripped). May be a new-style id
+    /// (`2301.00001v1`) or an old-style id containing a slash
+    /// (`hep-ex/0307015v1`).
+    pub id: String,
+
+    /// The article title.
+    pub title: String,
+
+    /// The article abstract.
+    pub summary: String,
+
+    /// The date version 1 of the article was submitted.
+    pub published: String,
+
+    /// The date the retrieved version of the article was submitted.
+    pub updated: String,
+
+    /// The article authors, in order of authorship.
+    pub authors: Vec<Author>,
+
+    /// The primary arXiv subject classification, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_category: Option<String>,
+
+    /// All arXiv / ACM / MSC subject classifications for the article.
+    #[serde(default)]
+    pub categories: Vec<String>,
+
+    /// The author's comment, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+
+    /// The journal reference, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub journal_ref: Option<String>,
+
+    /// The article DOI, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub doi: Option<String>,
+
+    /// URL of the article's abstract page.
+    pub abstract_url: String,
+
+    /// URL of the article's PDF, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pdf_url: Option<String>,
+
+    /// URL of the article's source (e-print) bundle, populated only when the
+    /// e-print URL responds with a successful HEAD request.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_url: Option<String>,
+}
+
+/// The full response of a `query` tool call.
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct QueryResponse {
+    /// The total number of results matching the query (not just this page).
+    pub total_results: u64,
+
+    /// The 0-based index of the first returned result within the total set.
+    pub start_index: u64,
+
+    /// The number of results returned in this page.
+    pub items_per_page: u64,
+
+    /// The returned articles.
+    pub entries: Vec<Entry>,
+}
+
+/// An error reported by the arXiv API.
+///
+/// arXiv does not signal query errors (e.g. malformed ids) via the HTTP
+/// status; instead it returns an Atom feed containing a single error entry.
+/// This struct captures that error entry.
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ArxivError {
+    /// A short error code parsed from the error id fragment, e.g.
+    /// `incorrect_id_format_for_1234.12345`, if present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+
+    /// The human-readable error message (the entry's `<summary>`).
+    pub message: String,
+
+    /// A URL to a more detailed explanation of the error.
+    pub link: String,
+
+    /// When the error response was generated.
+    pub updated: String,
+}
+
+/// The outcome of an arXiv query: either a successful result set or an error
+/// reported by the API. The two share the same Atom skeleton but are
+/// represented as distinct Rust types.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ArxivResponse {
+    Results(QueryResponse),
+    Error(ArxivError),
+}
+
+// ---------------------------------------------------------------------------
+// Internal Atom/XML deserialization types
+// ---------------------------------------------------------------------------
+//
+// quick-xml's serde support strips namespace prefixes and matches on the
+// element's local name, and exposes attributes as `@`-prefixed fields. The
+// renames below therefore use the local names (e.g. `totalResults`, not
+// `opensearch:totalResults`).
+
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct XmlFeed {
+    #[serde(rename = "totalResults", default)]
+    pub total_results: Option<String>,
+    #[serde(rename = "startIndex", default)]
+    pub start_index: Option<String>,
+    #[serde(rename = "itemsPerPage", default)]
+    pub items_per_page: Option<String>,
+    #[serde(rename = "entry", default)]
+    pub entries: Vec<XmlEntry>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct XmlEntry {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub published: String,
+    #[serde(default)]
+    pub updated: String,
+    #[serde(rename = "author", default)]
+    pub authors: Vec<XmlAuthor>,
+    #[serde(rename = "link", default)]
+    pub links: Vec<XmlLink>,
+    #[serde(rename = "category", default)]
+    pub categories: Vec<XmlCategory>,
+    #[serde(rename = "primary_category", default)]
+    pub primary_category: Option<XmlCategory>,
+    #[serde(rename = "comment", default)]
+    pub comment: Option<String>,
+    #[serde(rename = "journal_ref", default)]
+    pub journal_ref: Option<String>,
+    #[serde(rename = "doi", default)]
+    pub doi: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct XmlAuthor {
+    #[serde(default)]
+    pub name: String,
+    #[serde(rename = "affiliation", default)]
+    pub affiliation: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct XmlLink {
+    #[serde(rename = "@href", default)]
+    pub href: String,
+    #[serde(rename = "@rel", default)]
+    pub rel: Option<String>,
+    #[serde(rename = "@title", default)]
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub(crate) struct XmlCategory {
+    #[serde(rename = "@term", default)]
+    pub term: String,
+}
+
+// ---------------------------------------------------------------------------
+// Transformation helpers
+// ---------------------------------------------------------------------------
+
+/// Collapse all runs of whitespace into single spaces and trim the result.
+/// arXiv wraps titles and abstracts across multiple lines with leading
+/// indentation, so this produces a clean single-line value.
+fn normalize_whitespace(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn trimmed_opt(s: Option<String>) -> Option<String> {
+    s.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
+}
+
+/// Parse a bare arXiv id out of the `<id>` URL.
+///
+/// The `<id>` tag holds the abstract URL, e.g.
+/// `http://arxiv.org/abs/hep-ex/0307015v1`. We strip the `…/abs/` prefix to
+/// recover the identifier. Old-style ids contain a `/` (`hep-ex/0307015`),
+/// so we must strip a known prefix rather than splitting on the last `/`.
+pub fn parse_arxiv_id(id_url: &str) -> String {
+    let trimmed = id_url.trim();
+    trimmed
+        .strip_prefix(ABS_PREFIX_HTTPS)
+        .or_else(|| trimmed.strip_prefix(ABS_PREFIX_HTTP))
+        .unwrap_or(trimmed)
+        .to_string()
+}
+
+/// Build the candidate e-print (source) URL for a bare arXiv id.
+pub fn eprint_url(id: &str) -> String {
+    format!("https://arxiv.org/e-print/{id}")
+}
+
+impl Entry {
+    /// Convert a deserialized Atom entry into a clean [`Entry`].
+    ///
+    /// The `source_url` field is left as `None`; callers are expected to
+    /// verify the e-print URL (see [`eprint_url`]) and populate it.
+    pub(crate) fn from_xml(xml: XmlEntry) -> Entry {
+        let id = parse_arxiv_id(&xml.id);
+
+        let abstract_url = xml
+            .links
+            .iter()
+            .find(|l| l.rel.as_deref() == Some("alternate"))
+            .map(|l| l.href.clone())
+            .filter(|h| !h.is_empty())
+            .unwrap_or_else(|| xml.id.trim().to_string());
+
+        let pdf_url = xml
+            .links
+            .iter()
+            .find(|l| l.title.as_deref() == Some("pdf"))
+            .map(|l| l.href.clone())
+            .filter(|h| !h.is_empty());
+
+        let authors = xml
+            .authors
+            .into_iter()
+            .map(|a| Author {
+                name: normalize_whitespace(&a.name),
+                affiliation: trimmed_opt(a.affiliation),
+            })
+            .collect();
+
+        let categories = xml
+            .categories
+            .into_iter()
+            .map(|c| c.term.trim().to_string())
+            .filter(|t| !t.is_empty())
+            .collect();
+
+        Entry {
+            id,
+            title: normalize_whitespace(&xml.title),
+            summary: normalize_whitespace(&xml.summary),
+            published: xml.published.trim().to_string(),
+            updated: xml.updated.trim().to_string(),
+            authors,
+            primary_category: xml
+                .primary_category
+                .map(|c| c.term.trim().to_string())
+                .filter(|t| !t.is_empty()),
+            categories,
+            comment: trimmed_opt(xml.comment),
+            journal_ref: trimmed_opt(xml.journal_ref),
+            doi: trimmed_opt(xml.doi),
+            abstract_url,
+            pdf_url,
+            source_url: None,
+        }
+    }
+}
+
+/// Deserialize the shared Atom feed skeleton. Both successful and error
+/// responses use this same structure; classification happens afterwards based
+/// on the entry contents.
+fn parse_feed(xml: &str) -> Result<XmlFeed, quick_xml::DeError> {
+    quick_xml::de::from_str(xml)
+}
+
+fn parse_count(v: &Option<String>) -> u64 {
+    v.as_deref()
+        .and_then(|s| s.trim().parse::<u64>().ok())
+        .unwrap_or(0)
+}
+
+impl QueryResponse {
+    fn from_feed(feed: XmlFeed) -> QueryResponse {
+        QueryResponse {
+            total_results: parse_count(&feed.total_results),
+            start_index: parse_count(&feed.start_index),
+            items_per_page: parse_count(&feed.items_per_page),
+            entries: feed.entries.into_iter().map(Entry::from_xml).collect(),
+        }
+    }
+}
+
+impl ArxivError {
+    /// Build an [`ArxivError`] from a feed if it represents an arXiv error
+    /// response: a single entry whose id points at `arxiv.org/api/errors`.
+    fn from_feed(feed: &XmlFeed) -> Option<ArxivError> {
+        if feed.entries.len() != 1 {
+            return None;
+        }
+        let entry = &feed.entries[0];
+        let id = entry.id.trim();
+        if !id.contains("arxiv.org/api/errors") {
+            return None;
+        }
+
+        // The error id has the form `…/errors#incorrect_id_format_for_1234.12345`;
+        // the fragment after `#` is a machine-readable error code.
+        let code = id
+            .split_once('#')
+            .map(|(_, fragment)| fragment.trim().to_string())
+            .filter(|c| !c.is_empty());
+
+        Some(ArxivError {
+            code,
+            message: normalize_whitespace(&entry.summary),
+            link: id.to_string(),
+            updated: entry.updated.trim().to_string(),
+        })
+    }
+}
+
+impl ArxivResponse {
+    /// Parse an arXiv Atom feed, classifying it as either a successful result
+    /// set ([`QueryResponse`]) or an [`ArxivError`].
+    ///
+    /// `source_url` fields on successful results are left unpopulated; the
+    /// caller verifies e-print URLs separately.
+    pub fn from_atom(xml: &str) -> Result<ArxivResponse, quick_xml::DeError> {
+        let feed = parse_feed(xml)?;
+        Ok(match ArxivError::from_feed(&feed) {
+            Some(error) => ArxivResponse::Error(error),
+            None => ArxivResponse::Results(QueryResponse::from_feed(feed)),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const ELECTRON_FEED: &str = include_str!("../tests/fixtures/electron.xml");
+    const ERROR_FEED: &str = include_str!("../tests/fixtures/error.xml");
+
+    /// Parse a feed and unwrap the successful results variant.
+    fn parse_results(xml: &str) -> QueryResponse {
+        match ArxivResponse::from_atom(xml).expect("feed parses") {
+            ArxivResponse::Results(response) => response,
+            ArxivResponse::Error(error) => panic!("unexpected error response: {error:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_new_and_old_style_ids() {
+        assert_eq!(
+            parse_arxiv_id("http://arxiv.org/abs/2301.00001v1"),
+            "2301.00001v1"
+        );
+        assert_eq!(
+            parse_arxiv_id("https://arxiv.org/abs/2301.00001"),
+            "2301.00001"
+        );
+        // Old-style ids contain a slash and must not be split on the last `/`.
+        assert_eq!(
+            parse_arxiv_id("http://arxiv.org/abs/hep-ex/0307015v1"),
+            "hep-ex/0307015v1"
+        );
+        assert_eq!(
+            parse_arxiv_id("https://arxiv.org/abs/cond-mat/0011267"),
+            "cond-mat/0011267"
+        );
+        // Surrounding whitespace (as in the manual examples) is trimmed.
+        assert_eq!(
+            parse_arxiv_id("\n    http://arxiv.org/abs/hep-ex/0307015\n"),
+            "hep-ex/0307015"
+        );
+    }
+
+    #[test]
+    fn eprint_url_is_built_from_id() {
+        assert_eq!(
+            eprint_url("hep-ex/0307015v1"),
+            "https://arxiv.org/e-print/hep-ex/0307015v1"
+        );
+    }
+
+    #[test]
+    fn parses_feed_metadata() {
+        let response = parse_results(ELECTRON_FEED);
+        assert_eq!(response.total_results, 182239);
+        assert_eq!(response.start_index, 0);
+        assert_eq!(response.items_per_page, 2);
+        assert_eq!(response.entries.len(), 2);
+    }
+
+    #[test]
+    fn parses_first_entry() {
+        let response = parse_results(ELECTRON_FEED);
+        let entry = &response.entries[0];
+
+        assert_eq!(entry.id, "cond-mat/0011267v1");
+        assert_eq!(
+            entry.title,
+            "The electronic structure of cuprates from high energy spectroscopy"
+        );
+        assert!(entry.summary.starts_with("We report studies"));
+        // Whitespace and newlines in the abstract are collapsed.
+        assert!(!entry.summary.contains('\n'));
+        assert_eq!(entry.published, "2000-11-15T16:19:15Z");
+        assert_eq!(entry.updated, "2000-11-15T16:19:15Z");
+
+        assert_eq!(entry.authors.len(), 8);
+        assert_eq!(entry.authors[0].name, "Mark S. Golden");
+        assert!(entry.authors[0].affiliation.is_none());
+
+        assert_eq!(entry.primary_category.as_deref(), Some("cond-mat.supr-con"));
+        assert_eq!(
+            entry.categories,
+            vec!["cond-mat.supr-con", "cond-mat.str-el"]
+        );
+        assert_eq!(
+            entry.journal_ref.as_deref(),
+            Some("J. Electron Spectr. Relat. Phenom. 117-118, 203 (2001)")
+        );
+        assert!(entry.comment.as_deref().unwrap().contains("special issue"));
+        assert!(entry.doi.is_none());
+
+        assert_eq!(
+            entry.abstract_url,
+            "https://arxiv.org/abs/cond-mat/0011267v1"
+        );
+        assert_eq!(
+            entry.pdf_url.as_deref(),
+            Some("https://arxiv.org/pdf/cond-mat/0011267v1")
+        );
+        // source_url is only populated after a live HEAD check.
+        assert!(entry.source_url.is_none());
+    }
+
+    #[test]
+    fn error_feed_parses_into_error_variant() {
+        match ArxivResponse::from_atom(ERROR_FEED).expect("error feed parses") {
+            ArxivResponse::Error(error) => {
+                assert_eq!(error.message, "incorrect id format for 1234.12345");
+                assert_eq!(
+                    error.code.as_deref(),
+                    Some("incorrect_id_format_for_1234.12345")
+                );
+                assert!(error.link.contains("arxiv.org/api/errors"));
+                assert_eq!(error.updated, "2007-10-12T00:00:00-04:00");
+            }
+            ArxivResponse::Results(_) => panic!("expected an error response"),
+        }
+    }
+
+    #[test]
+    fn successful_feed_parses_into_results_variant() {
+        match ArxivResponse::from_atom(ELECTRON_FEED).expect("feed parses") {
+            ArxivResponse::Results(response) => {
+                assert_eq!(response.entries.len(), 2);
+                assert_eq!(response.total_results, 182239);
+            }
+            ArxivResponse::Error(_) => panic!("expected a results response"),
+        }
+    }
+}
