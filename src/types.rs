@@ -642,6 +642,75 @@ mod tests {
     }
 
     #[test]
+    fn parse_url_opt_rejects_invalid_and_accepts_valid() {
+        // Valid absolute URLs (optionally surrounded by whitespace) are kept.
+        assert!(parse_url_opt("https://arxiv.org/abs/2301.00001v1").is_some());
+        assert_eq!(
+            parse_url_opt("  https://arxiv.org/x  ").map(|u| u.to_string()),
+            Some("https://arxiv.org/x".to_string())
+        );
+        // Empty / whitespace-only input is rejected.
+        assert!(parse_url_opt("").is_none());
+        assert!(parse_url_opt("   ").is_none());
+        // Scheme-less / relative strings are not valid URLs and are rejected.
+        assert!(parse_url_opt("not a url").is_none());
+        assert!(parse_url_opt("/relative/path").is_none());
+        assert!(parse_url_opt("10.14722/ndss.2025").is_none());
+    }
+
+    #[test]
+    fn malformed_urls_are_dropped_from_entry() {
+        // A synthetic entry whose links are all malformed except one. Verifies
+        // that invalid URLs are omitted rather than surfaced to the caller.
+        let xml = XmlEntry {
+            id: "not a url".to_string(),
+            title: "Bad URL entry".to_string(),
+            links: vec![
+                // alternate (abstract) link with a malformed href
+                XmlLink {
+                    href: "not a url".to_string(),
+                    rel: Some("alternate".to_string()),
+                    title: None,
+                },
+                // pdf link with a malformed href
+                XmlLink {
+                    href: "/relative/path".to_string(),
+                    rel: Some("related".to_string()),
+                    title: Some("pdf".to_string()),
+                },
+                // doi related link with a malformed href
+                XmlLink {
+                    href: "10.14722/ndss.2025".to_string(),
+                    rel: Some("related".to_string()),
+                    title: Some("doi".to_string()),
+                },
+                // a well-formed related link, which must survive
+                XmlLink {
+                    href: "https://example.com/code".to_string(),
+                    rel: Some("related".to_string()),
+                    title: Some("code".to_string()),
+                },
+            ],
+            ..Default::default()
+        };
+
+        let entry = Entry::from_xml(xml);
+
+        // Both the malformed alternate link and the non-URL `<id>` fallback
+        // fail to parse, so no abstract URL is surfaced.
+        assert!(entry.abstract_url.is_none());
+        // Malformed pdf link is dropped.
+        assert!(entry.pdf_url.is_none());
+        // Only the single well-formed related link survives; the malformed
+        // `pdf` and `doi` links are dropped.
+        assert_eq!(entry.related_links.len(), 1);
+        assert_eq!(
+            entry.related_links.get("code").map(Url::as_str),
+            Some("https://example.com/code")
+        );
+    }
+
+    #[test]
     fn error_feed_parses_into_error_variant() {
         match ArxivResponse::from_atom(ERROR_FEED).expect("error feed parses") {
             ArxivResponse::Error(error) => {
