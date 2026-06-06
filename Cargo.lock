@@ -588,6 +588,7 @@ dependencies = [
  "extism-pdk",
  "git-version",
  "oauth2",
+ "percent-encoding",
  "quick-xml",
  "schemars",
  "serde",

@@ -6,6 +6,7 @@
 //! Atom 1.0 feed returned by the arXiv API before it is transformed into the
 //! clean, namespace-free [`QueryResponse`].
 
+use percent_encoding::percent_decode_str;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -327,6 +328,16 @@ fn trimmed_opt(s: Option<String>) -> Option<String> {
     s.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
 }
 
+/// Return a URL's path with the leading slash removed and percent-decoding
+/// applied, e.g. `https://doi.org/10.1/a%3Cb` -> `10.1/a<b`. Decoding
+/// normalizes away encoding differences so a DOI matches its resolved URL
+/// regardless of how the URL percent-encoded special characters.
+fn decoded_path_tail(url: &Url) -> String {
+    percent_decode_str(url.path().trim_start_matches('/'))
+        .decode_utf8_lossy()
+        .into_owned()
+}
+
 /// Parse a string into a [`Url`], returning `None` for empty or malformed
 /// input. Used to ensure only well-formed URLs are ever surfaced to callers.
 fn parse_url_opt(s: &str) -> Option<Url> {
@@ -383,10 +394,11 @@ impl Entry {
             .and_then(|l| parse_url_opt(&l.href));
 
         // Resolved DOI URLs come from `<link title="doi">` elements (one per
-        // DOI). A doi link is the resolved DOI, so its path is exactly
-        // `/<doi>`. Pair each `<arxiv:doi>` value with the link whose path tail
-        // equals it: this is order-independent and avoids matching a DOI that
-        // is merely a substring/prefix of another DOI's URL.
+        // DOI). A doi link is the resolved DOI, so its (percent-decoded) path
+        // is exactly `<doi>`. Pair each `<arxiv:doi>` value with the link whose
+        // decoded path tail equals it: this is order-independent, avoids
+        // matching a DOI that is merely a prefix of another DOI's URL, and is
+        // robust to URL percent-encoding of special characters in the DOI.
         let doi_links: Vec<Url> = xml
             .links
             .iter()
@@ -402,7 +414,7 @@ impl Entry {
                 doi: doi.to_string(),
                 url: doi_links
                     .iter()
-                    .find(|u| u.path().trim_start_matches('/') == doi)
+                    .find(|u| decoded_path_tail(u) == doi)
                     .cloned(),
             })
             .collect();
@@ -716,6 +728,35 @@ mod tests {
         assert_eq!(
             entry.dois[1].url.as_ref().map(Url::as_str),
             Some("https://doi.org/10.1234/foo.s1")
+        );
+    }
+
+    #[test]
+    fn doi_url_pairing_handles_percent_encoding() {
+        // A DOI with characters that are percent-encoded in the resolved URL
+        // (e.g. `<` -> `%3C`). Matching the raw DOI against the decoded path
+        // tail must still pair them.
+        let doi = "10.1175/1520-0485(2002)032<0363:TBPOML>2.0.CO;2";
+        let xml = XmlEntry {
+            id: "http://arxiv.org/abs/1234.5678v1".to_string(),
+            title: "Encoded DOI entry".to_string(),
+            doi: vec![doi.to_string()],
+            links: vec![XmlLink {
+                href: "https://doi.org/10.1175/1520-0485(2002)032%3C0363:TBPOML%3E2.0.CO;2"
+                    .to_string(),
+                rel: Some("related".to_string()),
+                title: Some("doi".to_string()),
+            }],
+            ..Default::default()
+        };
+
+        let entry = Entry::from_xml(xml);
+        assert_eq!(entry.dois.len(), 1);
+        assert_eq!(entry.dois[0].doi, doi);
+        // The DOI is paired with its (percent-encoded) resolved URL.
+        assert_eq!(
+            entry.dois[0].url.as_ref().map(Url::as_str),
+            Some("https://doi.org/10.1175/1520-0485(2002)032%3C0363:TBPOML%3E2.0.CO;2")
         );
     }
 
