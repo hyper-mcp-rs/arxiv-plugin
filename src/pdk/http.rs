@@ -44,10 +44,9 @@ pub(crate) fn http_request_with_retry(req: &HttpRequest) -> Result<HttpResponse>
             Ok(res) => {
                 let status = res.status_code();
 
-                // 503 is excluded: arXiv's Varnish edge returns it (after a long
-                // backend-fetch timeout) for overloaded or rate-limited
-                // traffic, so retrying only compounds the delay without helping.
-                let retryable = status == 429 || (status >= 500 && status != 503);
+                // Retry on rate-limit (429) and any server error (5xx),
+                // honoring Retry-After when present.
+                let retryable = status == 429 || status >= 500;
                 if attempt < MAX_HTTP_ATTEMPTS && retryable {
                     thread::sleep(
                         res.header("retry-after")
