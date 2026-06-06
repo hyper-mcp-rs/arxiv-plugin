@@ -1,0 +1,125 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/KLfuE87U7LCxYvrD3TBBhroYevw</id>
+  <title>arXiv Query: search_query=all:rust&amp;id_list=&amp;start=0&amp;max_results=5</title>
+  <updated>2026-06-06T20:39:22Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=all:rust&amp;start=0&amp;max_results=5&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>5</opensearch:itemsPerPage>
+  <opensearch:totalResults>774</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2606.06434v1</id>
+    <title>rsx: A high-performance streaming toolkit for RAD-seq sex determination</title>
+    <updated>2026-06-04T17:36:36Z</updated>
+    <link href="https://arxiv.org/abs/2606.06434v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2606.06434v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Restriction site-associated DNA sequencing (RAD-seq) is widely used to discover sex-linked markers in non-model organisms, but large studies produce marker tables with millions of RAD tags. RADSex provides the reference workflow for building marker-by-individual depth tables and testing sex-biased marker distributions, but its depth, merge, and related table-building commands grow memory-hungry, and its standard output reports frequentist calls with no posterior evidence and no direct Python or C integration. We present rsx, a Rust implementation of the complete RADSex command set that preserves marker-table semantics and command-line compatibility. rsx combines 2-bit DNA keys, parallel ingestion, memory-mapped marker tables, external sorting, bitset group counts, and streamed Gram-matrix PCA so that memory stays bounded by the number of individuals or by explicit buffers. It adds conjugate Beta-Binomial Bayes factors and posterior probabilities under XY and ZW hypotheses, returning strict, posterior-supported, and Bayes-factor-only evidence grades. A portable, libm-independent minimax approximation of the error function keeps the chi-squared tail reproducible across platforms without changing the underlying Yates test. On four real RAD-seq datasets comprising 41.9 billion bases and 29 million markers, rsx reproduced published RADSex v1.2.0 calls, achieved an 8.38-fold geometric-mean speedup across 56 paired timings (2.77-fold for FASTQ processing), and recovered every Bonferroni-significant positive-control marker. In Danio albolineatus, treated as null in the source publication, the posterior layer surfaced 30 W-linked marker hypotheses; in Notothenia rossii it withheld 400 Bayes-factor-only rows compatible with a low-prevalence null. Python bindings, a C API, and a reproducibility archive provide the workflows used for all reported numbers. rsx is released under GPL-3.0-or-later.</summary>
+    <category term="q-bio.GN" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.PF" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-06-04T17:36:36Z</published>
+    <arxiv:comment>37 pages, 12 figures. Software: https://github.com/HaoZeke/rsx-rs . Reproducibility archive: https://doi.org/10.5281/zenodo.20531539</arxiv:comment>
+    <arxiv:primary_category term="q-bio.GN"/>
+    <author>
+      <name>Rohit Goswami</name>
+      <arxiv:affiliation>TurtleTech ehf., Reykjavik, Iceland</arxiv:affiliation>
+      <arxiv:affiliation>Institute IMX and Lab-COSMO, EPFL, Lausanne, Switzerland</arxiv:affiliation>
+    </author>
+    <author>
+      <name>Ruhila Goswami</name>
+      <arxiv:affiliation>Faculty of Life and Environmental Sciences, University of Iceland, Reykjavik, Iceland</arxiv:affiliation>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2503.17181v4</id>
+    <title>A Study of LLMs' Preferences for Libraries and Programming Languages</title>
+    <updated>2026-06-04T14:55:07Z</updated>
+    <link href="https://arxiv.org/abs/2503.17181v4" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2503.17181v4" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Despite the rapid progress of large language models (LLMs) in code generation, existing evaluations focus on functional correctness or syntactic validity, overlooking how LLMs make critical design choices such as which library or programming language to use. To fill this gap, we perform the first empirical study of LLMs' preferences for libraries and programming languages when generating code, covering eight diverse LLMs. We observe a strong tendency to overuse widely adopted libraries such as NumPy; in up to 45% of cases, this usage is not required and deviates from the ground-truth solutions. The LLMs we study also show a significant preference toward Python as their default language. For high-performance project initialisation tasks where Python is not the optimal language, it remains the dominant choice in 58% of cases, and Rust is not used once. These results highlight how LLMs prioritise familiarity and popularity over suitability and task-specific optimality; underscoring the need for targeted fine-tuning, data diversification, and evaluation benchmarks that explicitly measure language and library selection fidelity.</summary>
+    <category term="cs.SE" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-03-21T14:29:35Z</published>
+    <arxiv:comment>21 pages, 10 tables, 3 figures. Accepted to Findings of ACL 2026</arxiv:comment>
+    <arxiv:primary_category term="cs.SE"/>
+    <author>
+      <name>Lukas Twist</name>
+    </author>
+    <author>
+      <name>Mark Harman</name>
+    </author>
+    <author>
+      <name>Don Syme</name>
+    </author>
+    <author>
+      <name>Joost Noppen</name>
+    </author>
+    <author>
+      <name>Helen Yannakoudakis</name>
+    </author>
+    <author>
+      <name>Detlef Nauck</name>
+    </author>
+    <author>
+      <name>Jie M. Zhang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2606.05733v1</id>
+    <title>Zero-Copy Semantic Contagion: An In-Memory Streaming Architecture for Evolving Attention Graphs</title>
+    <updated>2026-06-04T05:48:56Z</updated>
+    <link href="https://arxiv.org/abs/2606.05733v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2606.05733v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Per-ticker forecasting models dominate financial time-series work yet remain blind to cross-company propagation: a foundry disruption in Taiwan does not register in a single-asset model until Apple's own price has already moved. To address this limitation, we introduce a heterogeneous Rust-Python streaming architecture that maps cross-company attention as a continuous-time graph driven directly from text. We show that on the ingestion side, a zero-copy Rust edge parses news records in $\sim$100 ns and scans the target equity universe in $\sim$1.2 $μ$s. On the inference end, a multivariate Neural Hawkes Process featuring per-node continuous-time LSTM states and a bilinear latent projection propagates directed excitation, while an adaptive pruning rule bounds the computational cost of dynamic neighborhood updates. Combining these stages, we demonstrate an end-to-end processing latency of $\sim$13 ms per incoming news record on a single commodity CPU. Evaluated on a one-month temporal holdout of the FNSPID corpus (638 articles across 47 tickers), the system delivers a $1.70\times$ precision lift over random at the 90th-percentile next-day return threshold, and $3.36\times$ over a same-sector baseline. Crucially, removing the graph topology collapses precision to zero, confirming that the dynamic attention network is the sole driver of cross-company signal in this architecture.</summary>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CE" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="q-fin.CP" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="stat.ML" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-06-04T05:48:56Z</published>
+    <arxiv:comment>Accepted to the 2026 ACM SIGMOD Workshop on Data Management for the Modern Financial Systems (FinDS). 10 pages, 4 figures</arxiv:comment>
+    <arxiv:primary_category term="cs.LG"/>
+    <author>
+      <name>Kabir Murjani</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2606.04056v1</id>
+    <title>Token Budgets: An Empirical Catalog of 63 LLM-Agent Budget-Overrun Incidents, with an Affine-Typed Rust Mitigation as a Case Study</title>
+    <updated>2026-06-02T10:46:57Z</updated>
+    <link href="https://arxiv.org/abs/2606.04056v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2606.04056v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>LLM-agent budget overruns are a documented production failure class: a single retry loop can spend thousands of dollars before an operator notices, and the in-process integrity properties that would prevent it (no aliasing, no double-spend, no use-after-delegation of a cost-bearing value) are enforced, if at all, by ad-hoc wrappers rather than by the type system. Our central contribution is empirical: a catalog of 63 confirmed production incidents from 21 orchestration frameworks (2023-2026), each backed by a quoted GitHub issue and, where reported, a dollar loss, organized into an eight-cluster failure taxonomy (inter-rater Cohen's kappa = 0.837, N = 113), plus 47 supplementary structural entries. As one mitigation evaluated against this taxonomy, we build token-budgets, an 1,180-line Rust crate (no unsafe) that operationalizes affine ownership so that cloning, double-spending, or using a budget after delegating it are compile errors rather than runtime hazards an operator must remember to avoid. The dollar cap is runtime arithmetic under an estimator assumption; the affine layer makes that arithmetic non-bypassable. On single-agent workloads a 4-line Python counter matches the crate at 0/30 overshoot, so the distinguishing value is non-bypassability under operator error in multi-agent delegation: the delegation-fanout race documented in 11 incidents is rejected by the borrow checker at compile time, while the same pattern under asyncio overshoots 30/30 and three disciplined alternatives overshoot 0/30. Across five runtimes, three providers, and a temperature-stratified live-API test (N = 160), the approach reports zero cap violations and zero false refusals, at operational parity with concurrent work. Static over-reservation is 4-6x (2.11x adaptive). Binary-level cap-soundness on the running binary is left open.</summary>
+    <category term="cs.SE" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.MA" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.PL" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-06-02T10:46:57Z</published>
+    <arxiv:comment>26 pages. Artifact (catalog CSV, Rust crate, formal proofs): https://github.com/sajjadanwar0/token-budgets</arxiv:comment>
+    <arxiv:primary_category term="cs.SE"/>
+    <author>
+      <name>Sajjad Khan</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2307.10067v4</id>
+    <title>The Canonical Decomposition of Factor Models: Weak Factors are Everywhere</title>
+    <updated>2026-06-02T07:32:20Z</updated>
+    <link href="https://arxiv.org/abs/2307.10067v4" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2307.10067v4" rel="related" type="application/pdf" title="pdf"/>
+    <summary>We derive a novel canonical decomposition of factor models encompassing both the static factor model - where factors are loaded only contemporaneously - and the Generalised Dynamic Factor Model - where factors are loaded with lags. This decomposition features a new term: the weak common component, defined as the difference between the dynamic and static common components. It is driven by (possibly infinitely many) non-pervasive weak factors which belong to the dynamically common space. Through theoretical and empirical examples - both on U.S. macroeconomic indicators and global financial volatilities - we show that, in general, the weak common component shall not be neglected. Furthermore, we show that, by accounting for the presence of weak common components, we are likely to obtain Impulse Response Functions with more plausible shapes than those obtained from purely static approaches. In addition, we provide consistent estimators for all terms of the canonical decomposition and for the weak factors.</summary>
+    <category term="econ.EM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="math.ST" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2023-07-13T23:08:49Z</published>
+    <arxiv:primary_category term="econ.EM"/>
+    <author>
+      <name>Philipp Gersing</name>
+    </author>
+    <author>
+      <name>Matteo Barigozzi</name>
+    </author>
+    <author>
+      <name>Christoph Rust</name>
+    </author>
+    <author>
+      <name>Manfred Deistler</name>
+    </author>
+  </entry>
+</feed>

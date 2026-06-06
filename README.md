@@ -41,7 +41,7 @@ deserializes into a structured response:
       "summary": "...",                  // the abstract
       "published": "2000-11-15T16:19:15Z",
       "updated": "2000-11-15T16:19:15Z",
-      "authors": [{ "name": "...", "affiliation": "..." }],
+      "authors": [{ "name": "...", "affiliations": ["..."] }],
       "primary_category": "cond-mat.supr-con",
       "categories": ["cond-mat.supr-con", "cond-mat.str-el"],
       "comment": "...",                  // optional

@@ -109,9 +109,10 @@ pub struct Author {
     /// The author's name.
     pub name: String,
 
-    /// The author's affiliation, if provided.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub affiliation: Option<String>,
+    /// The author's affiliations, if provided. arXiv allows an author to list
+    /// more than one affiliation.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub affiliations: Vec<String>,
 }
 
 /// A single article returned by an arXiv query.
@@ -281,8 +282,10 @@ pub(crate) struct XmlEntry {
 pub(crate) struct XmlAuthor {
     #[serde(default)]
     pub name: String,
+    // An author may carry multiple `<arxiv:affiliation>` elements, so this must
+    // be a `Vec` (a scalar would fail with "duplicate field `affiliation`").
     #[serde(rename = "affiliation", default)]
-    pub affiliation: Option<String>,
+    pub affiliation: Vec<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -394,7 +397,12 @@ impl Entry {
             .into_iter()
             .map(|a| Author {
                 name: normalize_whitespace(&a.name),
-                affiliation: trimmed_opt(a.affiliation),
+                affiliations: a
+                    .affiliation
+                    .iter()
+                    .map(|s| normalize_whitespace(s))
+                    .filter(|s| !s.is_empty())
+                    .collect(),
             })
             .collect();
 
@@ -503,6 +511,7 @@ mod tests {
     const ELECTRON_FEED: &str = include_str!("../tests/fixtures/electron.xml");
     const ERROR_FEED: &str = include_str!("../tests/fixtures/error.xml");
     const RUST_FEED: &str = include_str!("../tests/fixtures/rust.xml");
+    const RUST_LASTUPDATED_FEED: &str = include_str!("../tests/fixtures/rust_lastupdated.xml");
 
     /// Parse a feed and unwrap the successful results variant.
     fn parse_results(xml: &str) -> QueryResponse {
@@ -573,7 +582,7 @@ mod tests {
 
         assert_eq!(entry.authors.len(), 8);
         assert_eq!(entry.authors[0].name, "Mark S. Golden");
-        assert!(entry.authors[0].affiliation.is_none());
+        assert!(entry.authors[0].affiliations.is_empty());
 
         assert_eq!(entry.primary_category.as_deref(), Some("cond-mat.supr-con"));
         assert_eq!(
@@ -639,6 +648,28 @@ mod tests {
             last.related_links.get("doi").map(Url::as_str),
             Some("https://doi.org/10.14722/ndss.2025.241407")
         );
+    }
+
+    #[test]
+    fn parses_author_with_multiple_affiliations() {
+        // The first author of the first entry in this feed carries two
+        // `<arxiv:affiliation>` elements. A scalar field would fail to
+        // deserialize with "duplicate field `affiliation`".
+        let response = parse_results(RUST_LASTUPDATED_FEED);
+        let first_author = &response.entries[0].authors[0];
+        assert_eq!(first_author.name, "Rohit Goswami");
+        assert_eq!(
+            first_author.affiliations,
+            vec![
+                "TurtleTech ehf., Reykjavik, Iceland".to_string(),
+                "Institute IMX and Lab-COSMO, EPFL, Lausanne, Switzerland".to_string(),
+            ]
+        );
+
+        // An author with a single affiliation still yields a one-element vec.
+        let second_author = &response.entries[0].authors[1];
+        assert_eq!(second_author.name, "Ruhila Goswami");
+        assert_eq!(second_author.affiliations.len(), 1);
     }
 
     #[test]
