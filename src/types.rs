@@ -8,7 +8,6 @@
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use url::Url;
 
 const ABS_PREFIX_HTTP: &str = "http://arxiv.org/abs/";
@@ -103,6 +102,19 @@ pub struct QueryArguments {
 // Tool response (structured output)
 // ---------------------------------------------------------------------------
 
+/// A DOI associated with an article, together with its resolved URL when
+/// arXiv provides one.
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Doi {
+    /// The DOI itself, e.g. `10.1103/PhysRevD.61.084004`.
+    pub doi: String,
+
+    /// The resolved DOI URL (from the matching `<link title="doi">`), if
+    /// present and well-formed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<Url>,
+}
+
 /// An author of an article.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Author {
@@ -156,9 +168,9 @@ pub struct Entry {
     pub journal_ref: Option<String>,
 
     /// The article DOIs, if present. A single article may resolve to several
-    /// DOIs (e.g. an original plus errata).
+    /// DOIs (e.g. an original plus errata), each with its resolved URL.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub dois: Vec<String>,
+    pub dois: Vec<Doi>,
 
     /// URL of the article's abstract page. Present whenever the feed provides
     /// a well-formed URL (always, in practice).
@@ -173,14 +185,6 @@ pub struct Entry {
     /// e-print URL responds with a successful HEAD request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_url: Option<Url>,
-
-    /// Additional links associated with the article, keyed by their `title`
-    /// (e.g. `pdf`, `doi`). Includes every entry `<link>` that carries both a
-    /// `rel` and a `title` attribute and a well-formed URL. Note that the `pdf`
-    /// link is also exposed discretely as `pdf_url`; it is duplicated here for
-    /// completeness.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub related_links: BTreeMap<String, Url>,
 }
 
 /// The full response of a `query` tool call.
@@ -378,21 +382,23 @@ impl Entry {
             .find(|l| l.title.as_deref() == Some("pdf"))
             .and_then(|l| parse_url_opt(&l.href));
 
-        // Collect every link that carries both a `rel` and a `title` attribute
-        // and a well-formed URL, keyed by its title (e.g. `pdf`, `doi`). The
-        // abstract link has no title and is exposed separately via
-        // `abstract_url`.
-        let related_links = xml
+        // Resolved DOI URLs come from `<link title="doi">` elements (one per
+        // DOI). Pair each `<arxiv:doi>` value with the link whose URL contains
+        // it, so order differences between the two lists don't matter.
+        let doi_links: Vec<Url> = xml
             .links
             .iter()
-            .filter(|l| l.rel.is_some())
-            .filter_map(|l| {
-                let title = l.title.as_deref()?.trim();
-                if title.is_empty() {
-                    return None;
-                }
-                let url = parse_url_opt(&l.href)?;
-                Some((title.to_string(), url))
+            .filter(|l| l.title.as_deref() == Some("doi"))
+            .filter_map(|l| parse_url_opt(&l.href))
+            .collect();
+        let dois = xml
+            .doi
+            .iter()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|doi| Doi {
+                doi: doi.to_string(),
+                url: doi_links.iter().find(|u| u.as_str().contains(doi)).cloned(),
             })
             .collect();
 
@@ -431,16 +437,10 @@ impl Entry {
             categories,
             comment: trimmed_opt(xml.comment),
             journal_ref: trimmed_opt(xml.journal_ref),
-            dois: xml
-                .doi
-                .iter()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect(),
+            dois,
             abstract_url,
             pdf_url,
             source_url: None,
-            related_links,
         }
     }
 }
@@ -616,14 +616,6 @@ mod tests {
         );
         // source_url is only populated after a live HEAD check.
         assert!(entry.source_url.is_none());
-
-        // This entry has only `alternate` (no title) and `pdf` links, so the
-        // related-links map contains just `pdf` (the abstract link is omitted).
-        assert_eq!(entry.related_links.len(), 1);
-        assert_eq!(
-            entry.related_links.get("pdf").map(Url::as_str),
-            Some("https://arxiv.org/pdf/cond-mat/0011267v1")
-        );
     }
 
     #[test]
@@ -638,7 +630,6 @@ mod tests {
 
         let last = response.entries.last().unwrap();
         assert_eq!(last.id, "2411.14174v2");
-        assert_eq!(last.dois, vec!["10.14722/ndss.2025.241407".to_string()]);
         assert_eq!(
             last.abstract_url.as_ref().map(Url::as_str),
             Some("https://arxiv.org/abs/2411.14174v2")
@@ -648,14 +639,12 @@ mod tests {
             Some("https://arxiv.org/pdf/2411.14174v2")
         );
 
-        // The related-links map captures both the `pdf` (duplicated from
-        // `pdf_url`) and the non-contiguous `doi` link.
+        // The DOI comes from the non-contiguous `<arxiv:doi>` element and is
+        // paired with its resolved URL from the matching `<link title="doi">`.
+        assert_eq!(last.dois.len(), 1);
+        assert_eq!(last.dois[0].doi, "10.14722/ndss.2025.241407");
         assert_eq!(
-            last.related_links.get("pdf").map(Url::as_str),
-            Some("https://arxiv.org/pdf/2411.14174v2")
-        );
-        assert_eq!(
-            last.related_links.get("doi").map(Url::as_str),
+            last.dois[0].url.as_ref().map(Url::as_str),
             Some("https://doi.org/10.14722/ndss.2025.241407")
         );
     }
@@ -666,16 +655,24 @@ mod tests {
         // would fail with "duplicate field `doi`".
         let response = parse_results(MULTI_DOI_FEED);
         let entry = &response.entries[0];
+        let dois: Vec<&str> = entry.dois.iter().map(|d| d.doi.as_str()).collect();
         assert_eq!(
-            entry.dois,
+            dois,
             vec![
-                "10.1103/PhysRevD.61.084004".to_string(),
-                "10.1103/PhysRevD.63.049902".to_string(),
-                "10.1103/PhysRevD.65.069902".to_string(),
-                "10.1103/PhysRevD.67.089901".to_string(),
-                "10.1103/PhysRevD.78.109902".to_string(),
+                "10.1103/PhysRevD.61.084004",
+                "10.1103/PhysRevD.63.049902",
+                "10.1103/PhysRevD.65.069902",
+                "10.1103/PhysRevD.67.089901",
+                "10.1103/PhysRevD.78.109902",
             ]
         );
+        // Each DOI is paired with its resolved `https://doi.org/<doi>` URL.
+        for d in &entry.dois {
+            assert_eq!(
+                d.url.as_ref().map(Url::as_str),
+                Some(format!("https://doi.org/{}", d.doi).as_str())
+            );
+        }
     }
 
     #[test]
@@ -719,11 +716,13 @@ mod tests {
 
     #[test]
     fn malformed_urls_are_dropped_from_entry() {
-        // A synthetic entry whose links are all malformed except one. Verifies
-        // that invalid URLs are omitted rather than surfaced to the caller.
+        // A synthetic entry whose links are all malformed. Verifies that
+        // invalid URLs are omitted rather than surfaced to the caller, while
+        // the DOI string itself is still retained.
         let xml = XmlEntry {
             id: "not a url".to_string(),
             title: "Bad URL entry".to_string(),
+            doi: vec!["10.1234/example".to_string()],
             links: vec![
                 // alternate (abstract) link with a malformed href
                 XmlLink {
@@ -737,17 +736,11 @@ mod tests {
                     rel: Some("related".to_string()),
                     title: Some("pdf".to_string()),
                 },
-                // doi related link with a malformed href
+                // doi link with a malformed (scheme-less) href
                 XmlLink {
-                    href: "10.14722/ndss.2025".to_string(),
+                    href: "10.1234/example".to_string(),
                     rel: Some("related".to_string()),
                     title: Some("doi".to_string()),
-                },
-                // a well-formed related link, which must survive
-                XmlLink {
-                    href: "https://example.com/code".to_string(),
-                    rel: Some("related".to_string()),
-                    title: Some("code".to_string()),
                 },
             ],
             ..Default::default()
@@ -760,13 +753,10 @@ mod tests {
         assert!(entry.abstract_url.is_none());
         // Malformed pdf link is dropped.
         assert!(entry.pdf_url.is_none());
-        // Only the single well-formed related link survives; the malformed
-        // `pdf` and `doi` links are dropped.
-        assert_eq!(entry.related_links.len(), 1);
-        assert_eq!(
-            entry.related_links.get("code").map(Url::as_str),
-            Some("https://example.com/code")
-        );
+        // The DOI string is kept, but its malformed link URL is dropped to None.
+        assert_eq!(entry.dois.len(), 1);
+        assert_eq!(entry.dois[0].doi, "10.1234/example");
+        assert!(entry.dois[0].url.is_none());
     }
 
     #[test]

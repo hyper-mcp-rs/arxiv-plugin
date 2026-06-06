@@ -46,14 +46,12 @@ deserializes into a structured response:
       "categories": ["cond-mat.supr-con", "cond-mat.str-el"],
       "comment": "...",                  // optional
       "journal_ref": "...",              // optional
-      "dois": ["..."],                    // optional (may be several)
+      "dois": [                          // optional (may be several)
+        { "doi": "10.1234/example", "url": "https://doi.org/10.1234/example" }
+      ],
       "abstract_url": "https://arxiv.org/abs/cond-mat/0011267v1",
       "pdf_url": "https://arxiv.org/pdf/cond-mat/0011267v1",
-      "source_url": "https://arxiv.org/e-print/cond-mat/0011267v1",  // optional
-      "related_links": {                 // optional, keyed by link title
-        "pdf": "https://arxiv.org/pdf/cond-mat/0011267v1",
-        "doi": "https://doi.org/10.1234/example"
-      }
+      "source_url": "https://arxiv.org/e-print/cond-mat/0011267v1"  // optional
     }
   ]
 }
@@ -72,14 +70,13 @@ Notes on the parsing:
   `https://arxiv.org/e-print/<id>`. It is included **only** when a `HEAD`
   request to that URL returns a 2xx status, so it is omitted for articles
   without a published source bundle.
-- **`related_links`** is a map (title → url) of every entry `<link>` that
-  carries both a `rel` and a `title` attribute, e.g. `pdf` and `doi`. The
-  abstract page link has no title and is exposed separately as `abstract_url`.
-  The `pdf` link is intentionally duplicated here even though it is also
-  available discretely as `pdf_url`.
+- **`dois`** is a list of `{ doi, url }` objects. An article may have several
+  DOIs (e.g. an original plus errata). Each DOI string comes from an
+  `<arxiv:doi>` element and is paired with its resolved URL from the matching
+  `<link title="doi">` element (omitted if absent or malformed).
 
-Every URL field (`abstract_url`, `pdf_url`, `source_url`, and the `related_links`
-values) is parsed and validated as a well-formed URL before being returned; any
+Every URL field (`abstract_url`, `pdf_url`, `source_url`, and each `dois[].url`)
+is parsed and validated as a well-formed URL before being returned; any
 malformed URL is omitted rather than passed through. The values are still
 serialized as JSON strings, and the output schema marks them with
 `"format": "uri"`.
