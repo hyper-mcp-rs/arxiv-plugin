@@ -49,7 +49,11 @@ deserializes into a structured response:
       "doi": "...",                      // optional
       "abstract_url": "https://arxiv.org/abs/cond-mat/0011267v1",
       "pdf_url": "https://arxiv.org/pdf/cond-mat/0011267v1",
-      "source_url": "https://arxiv.org/e-print/cond-mat/0011267v1"  // optional
+      "source_url": "https://arxiv.org/e-print/cond-mat/0011267v1",  // optional
+      "related_links": {                 // optional, keyed by link title
+        "pdf": "https://arxiv.org/pdf/cond-mat/0011267v1",
+        "doi": "https://doi.org/10.1234/example"
+      }
     }
   ]
 }
@@ -68,6 +72,11 @@ Notes on the parsing:
   `https://arxiv.org/e-print/<id>`. It is included **only** when a `HEAD`
   request to that URL returns a 2xx status, so it is omitted for articles
   without a published source bundle.
+- **`related_links`** is a map (title → url) of every entry `<link>` that
+  carries both a `rel` and a `title` attribute, e.g. `pdf` and `doi`. The
+  abstract page link has no title and is exposed separately as `abstract_url`.
+  The `pdf` link is intentionally duplicated here even though it is also
+  available discretely as `pdf_url`.
 
 arXiv reports query errors (such as malformed ids) as an Atom feed containing a
 single error entry; the plugin detects these and returns them as a tool error.

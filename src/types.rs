@@ -8,6 +8,7 @@
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 const ABS_PREFIX_HTTP: &str = "http://arxiv.org/abs/";
 const ABS_PREFIX_HTTPS: &str = "https://arxiv.org/abs/";
@@ -167,6 +168,13 @@ pub struct Entry {
     /// e-print URL responds with a successful HEAD request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_url: Option<String>,
+
+    /// Additional links associated with the article, keyed by their `title`
+    /// (e.g. `pdf`, `doi`). Includes every entry `<link>` that carries both a
+    /// `rel` and a `title` attribute. Note that the `pdf` link is also exposed
+    /// discretely as `pdf_url`; it is duplicated here for completeness.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub related_links: BTreeMap<String, String>,
 }
 
 /// The full response of a `query` tool call.
@@ -347,6 +355,24 @@ impl Entry {
             .map(|l| l.href.clone())
             .filter(|h| !h.is_empty());
 
+        // Collect every link that carries both a `rel` and a `title` attribute,
+        // keyed by its title (e.g. `pdf`, `doi`). The abstract link has no
+        // title and is exposed separately via `abstract_url`.
+        let related_links = xml
+            .links
+            .iter()
+            .filter(|l| l.rel.is_some())
+            .filter_map(|l| {
+                let title = l.title.as_deref()?.trim();
+                let href = l.href.trim();
+                if title.is_empty() || href.is_empty() {
+                    None
+                } else {
+                    Some((title.to_string(), href.to_string()))
+                }
+            })
+            .collect();
+
         let authors = xml
             .authors
             .into_iter()
@@ -381,6 +407,7 @@ impl Entry {
             abstract_url,
             pdf_url,
             source_url: None,
+            related_links,
         }
     }
 }
@@ -554,6 +581,14 @@ mod tests {
         );
         // source_url is only populated after a live HEAD check.
         assert!(entry.source_url.is_none());
+
+        // This entry has only `alternate` (no title) and `pdf` links, so the
+        // related-links map contains just `pdf` (the abstract link is omitted).
+        assert_eq!(entry.related_links.len(), 1);
+        assert_eq!(
+            entry.related_links.get("pdf").map(String::as_str),
+            Some("https://arxiv.org/pdf/cond-mat/0011267v1")
+        );
     }
 
     #[test]
@@ -573,6 +608,17 @@ mod tests {
         assert_eq!(
             last.pdf_url.as_deref(),
             Some("https://arxiv.org/pdf/2411.14174v2")
+        );
+
+        // The related-links map captures both the `pdf` (duplicated from
+        // `pdf_url`) and the non-contiguous `doi` link.
+        assert_eq!(
+            last.related_links.get("pdf").map(String::as_str),
+            Some("https://arxiv.org/pdf/2411.14174v2")
+        );
+        assert_eq!(
+            last.related_links.get("doi").map(String::as_str),
+            Some("https://doi.org/10.14722/ndss.2025.241407")
         );
     }
 
