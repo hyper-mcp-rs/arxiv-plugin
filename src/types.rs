@@ -383,8 +383,10 @@ impl Entry {
             .and_then(|l| parse_url_opt(&l.href));
 
         // Resolved DOI URLs come from `<link title="doi">` elements (one per
-        // DOI). Pair each `<arxiv:doi>` value with the link whose URL contains
-        // it, so order differences between the two lists don't matter.
+        // DOI). A doi link is the resolved DOI, so its path is exactly
+        // `/<doi>`. Pair each `<arxiv:doi>` value with the link whose path tail
+        // equals it: this is order-independent and avoids matching a DOI that
+        // is merely a substring/prefix of another DOI's URL.
         let doi_links: Vec<Url> = xml
             .links
             .iter()
@@ -398,7 +400,10 @@ impl Entry {
             .filter(|s| !s.is_empty())
             .map(|doi| Doi {
                 doi: doi.to_string(),
-                url: doi_links.iter().find(|u| u.as_str().contains(doi)).cloned(),
+                url: doi_links
+                    .iter()
+                    .find(|u| u.path().trim_start_matches('/') == doi)
+                    .cloned(),
             })
             .collect();
 
@@ -673,6 +678,45 @@ mod tests {
                 Some(format!("https://doi.org/{}", d.doi).as_str())
             );
         }
+    }
+
+    #[test]
+    fn doi_url_pairing_is_exact_not_substring() {
+        // Two DOIs where one is a prefix of the other, with the links listed in
+        // an order that would mis-pair under a substring match. Verifies each
+        // DOI resolves to its own URL via exact path-tail matching.
+        let xml = XmlEntry {
+            id: "http://arxiv.org/abs/1234.5678v1".to_string(),
+            title: "Prefix DOI entry".to_string(),
+            doi: vec!["10.1234/foo".to_string(), "10.1234/foo.s1".to_string()],
+            links: vec![
+                // The longer (prefix-containing) URL is listed first on purpose.
+                XmlLink {
+                    href: "https://doi.org/10.1234/foo.s1".to_string(),
+                    rel: Some("related".to_string()),
+                    title: Some("doi".to_string()),
+                },
+                XmlLink {
+                    href: "https://doi.org/10.1234/foo".to_string(),
+                    rel: Some("related".to_string()),
+                    title: Some("doi".to_string()),
+                },
+            ],
+            ..Default::default()
+        };
+
+        let entry = Entry::from_xml(xml);
+        assert_eq!(entry.dois.len(), 2);
+        assert_eq!(entry.dois[0].doi, "10.1234/foo");
+        assert_eq!(
+            entry.dois[0].url.as_ref().map(Url::as_str),
+            Some("https://doi.org/10.1234/foo")
+        );
+        assert_eq!(entry.dois[1].doi, "10.1234/foo.s1");
+        assert_eq!(
+            entry.dois[1].url.as_ref().map(Url::as_str),
+            Some("https://doi.org/10.1234/foo.s1")
+        );
     }
 
     #[test]
